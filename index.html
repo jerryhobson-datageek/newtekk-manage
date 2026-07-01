@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NewTekk Manage</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────────────── */
+    :root {
+      --sidebar-bg:     #1b2132;
+      --sidebar-width:  232px;
+      --page-bg:        #f6f7f9;
+      --accent:         #0069ff;
+      --accent-hover:   #0055cc;
+      --text-primary:   #111827;
+      --text-secondary: #6b7280;
+      --border:         #e5e7eb;
+      --card-bg:        #ffffff;
+      --sidebar-text:   #94a3b8;
+      --sidebar-active-bg: rgba(0,105,255,0.15);
+      --green: #10b981; --red: #ef4444; --yellow: #f59e0b;
+      --radius: 8px;
+      --shadow:    0 1px 3px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--page-bg); color: var(--text-primary); min-height: 100vh; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Login ─────────────────────────────────────────────────────────── */
+    #login-view {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; background: var(--page-bg);
+    }
+    .login-card {
+      width: 380px; background: var(--card-bg); border-radius: 12px;
+      border: 1px solid var(--border); box-shadow: var(--shadow-md); padding: 40px;
+    }
+    .login-logo {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px; margin-bottom: 32px; text-align: center;
+    }
+    .logo-mark {
+      width: 52px; height: 52px; background: var(--accent); border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 26px; font-weight: 800; letter-spacing: -1px;
+    }
+    .login-logo h1 { font-size: 20px; font-weight: 700; }
+    .login-logo p  { font-size: 13px; color: var(--text-secondary); }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+    .form-group input {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--border);
+      border-radius: var(--radius); font-size: 14px; font-family: inherit;
+      background: var(--card-bg); color: var(--text-primary); outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .form-group input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0,105,255,.12);
+    }
+    .btn-primary {
+      width: 100%; margin-top: 8px; padding: 10px; background: var(--accent);
+      color: #fff; border: none; border-radius: var(--radius);
+      font-size: 14px; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-primary:hover  { background: var(--accent-hover); }
+    .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+    .login-error {
+      display: none; margin-top: 14px; padding: 10px 12px;
+      background: #fef2f2; border: 1px solid #fecaca;
+      border-radius: var(--radius); color: #dc2626; font-size: 13px;
+    }
+
+    /* ── App shell ─────────────────────────────────────────────────────── */
+    #app-shell { display: none; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar {
+      position: fixed; inset: 0 auto 0 0; width: var(--sidebar-width);
+      background: var(--sidebar-bg); display: flex; flex-direction: column;
+      z-index: 200; transition: transform .25s ease;
+    }
+    .sidebar-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 18px 16px; border-bottom: 1px solid rgba(255,255,255,.07); flex-shrink: 0;
+    }
+    .sidebar-logo-mark {
+      width: 32px; height: 32px; background: var(--accent); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 15px; font-weight: 800; flex-shrink: 0;
+    }
+    .sidebar-logo-text { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.1; }
+    .sidebar-logo-sub  { font-size: 11px; color: var(--sidebar-text); }
+
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 12px 0; }
+    .nav-label {
+      font-size: 10px; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--sidebar-text);
+      padding: 14px 16px 5px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 12px; margin: 1px 8px; border-radius: 6px;
+      color: var(--sidebar-text); font-size: 13.5px; font-weight: 500;
+      cursor: pointer; transition: background .12s, color .12s; user-select: none;
+    }
+    .nav-item:hover  { background: rgba(255,255,255,.06); color: #fff; }
+    .nav-item.active { background: var(--sidebar-active-bg); color: var(--accent); }
+    .nav-item.disabled { opacity: .45; cursor: default; pointer-events: none; }
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; stroke-width: 2; }
+
+    .sidebar-footer { padding: 12px 8px; border-top: 1px solid rgba(255,255,255,.07); flex-shrink: 0; }
+    .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 6px; }
+    .user-avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 13px; font-weight: 600; flex-shrink: 0;
+    }
+    .user-name { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-role { font-size: 11px; color: var(--sidebar-text); }
+    .sidebar-footer-links { display: flex; gap: 4px; padding-top: 6px; }
+    .footer-link {
+      flex: 1; text-align: center; padding: 6px; border-radius: 4px;
+      font-size: 12px; color: var(--sidebar-text); cursor: pointer;
+      transition: color .12s, background .12s;
+    }
+    .footer-link:hover { color: #fff; background: rgba(255,255,255,.07); }
+
+    /* Main */
+    .main { margin-left: var(--sidebar-width); display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* Topbar */
+    .topbar {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; gap: 14px;
+      height: 56px; padding: 0 24px;
+      background: var(--card-bg); border-bottom: 1px solid var(--border);
+    }
+    .hamburger {
+      display: none; background: none; border: none; cursor: pointer;
+      padding: 4px; color: var(--text-secondary); align-items: center;
+    }
+    .hamburger svg { width: 20px; height: 20px; stroke-width: 2; }
+    .breadcrumb { flex: 1; font-size: 14px; color: var(--text-secondary); }
+    .breadcrumb span { color: var(--text-primary); font-weight: 500; }
+    .topbar-search {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 12px; background: var(--page-bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text-secondary); font-size: 13px; width: 200px;
+    }
+    .topbar-search svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .icon-btn {
+      width: 36px; height: 36px; border: none; background: none; cursor: pointer;
+      border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      color: var(--text-secondary); transition: background .12s;
+    }
+    .icon-btn:hover { background: var(--page-bg); }
+    .icon-btn svg { width: 18px; height: 18px; stroke-width: 2; }
+    .topbar-avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0;
+    }
+
+    /* Content */
+    .content { flex: 1; padding: 24px; }
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px;
+    }
+    .card + .card { margin-top: 16px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .card-title  { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .card-action {
+      font-size: 13px; color: var(--accent); background: none;
+      border: none; font-family: inherit; cursor: pointer; padding: 0;
+    }
+    .card-action:hover { text-decoration: underline; }
+
+    /* Stat grid */
+    .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 20px; }
+    .stat-card  { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+    .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-secondary); margin-bottom: 10px; }
+    .stat-value { font-size: 28px; font-weight: 700; line-height: 1; }
+    .stat-sub   { font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--text-secondary);
+      padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border);
+    }
+    td { padding: 11px 12px; font-size: 13.5px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #fafafa; }
+
+    /* Badges */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 8px; border-radius: 20px; font-size: 11.5px; font-weight: 600;
+    }
+    .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .badge.online  { background: #ecfdf5; color: #059669; }
+    .badge.online::before  { background: var(--green); }
+    .badge.offline { background: #fef2f2; color: #dc2626; }
+    .badge.offline::before { background: var(--red); }
+    .badge.warning { background: #fffbeb; color: #d97706; }
+    .badge.warning::before { background: var(--yellow); }
+
+    /* Apps grid */
+    .apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap: 12px; }
+    .app-card  {
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+      display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow);
+    }
+    .app-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+    .app-emoji { font-size: 22px; line-height: 1; }
+    .app-name  { font-size: 13.5px; font-weight: 600; }
+    .app-desc  { font-size: 12px; color: var(--text-secondary); }
+    .app-ms    { font-size: 12px; color: var(--text-secondary); }
+    .app-link  { font-size: 12px; color: var(--accent); margin-top: 2px; }
+    .app-link:hover { text-decoration: underline; }
+
+    /* Buttons */
+    .btn { padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all .12s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-sm   { padding: 5px 10px; font-size: 12px; }
+    .btn-accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn-accent:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-ghost  { background: none; color: var(--text-primary); border-color: var(--border); }
+    .btn-ghost:hover { background: var(--page-bg); }
+    .btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-danger { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+    .btn-danger:hover { background: #fee2e2; }
+
+    /* Dashboard bottom grid */
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px; }
+
+    /* Quick links */
+    .quick-links { display: flex; flex-direction: column; gap: 8px; }
+    .quick-link {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: background .12s; color: var(--text-primary);
+    }
+    .quick-link:hover { background: var(--page-bg); }
+
+    /* Spinner */
+    .spinner { display: flex; align-items: center; justify-content: center; padding: 60px; }
+    .spinner-ring {
+      width: 32px; height: 32px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    .toast {
+      padding: 12px 16px; border-radius: var(--radius); font-size: 13.5px;
+      box-shadow: var(--shadow-md); animation: toast-in .2s ease; max-width: 320px;
+      pointer-events: auto;
+    }
+    .toast.success { background: #065f46; color: #fff; }
+    .toast.error   { background: #991b1b; color: #fff; }
+    .toast.info    { background: #1e40af; color: #fff; }
+    @keyframes toast-in { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* Settings */
+    .settings-group   { margin-bottom: 28px; }
+    .settings-label   { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-secondary); margin-bottom: 10px; }
+    .settings-row     { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-val     { color: var(--text-secondary); font-size: 13px; font-family: monospace; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 48px 24px; color: var(--text-secondary); }
+    .empty-state h3 { font-size: 16px; color: var(--text-primary); margin-bottom: 8px; }
+    .empty-state p  { font-size: 13px; }
+
+    /* Sidebar overlay (mobile) */
+    .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 150; }
+
+    /* Bottom nav (mobile) */
+    .bottom-nav {
+      display: none; position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--card-bg); border-top: 1px solid var(--border); z-index: 99;
+      padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px));
+    }
+    .bottom-nav-items { display: flex; justify-content: space-around; }
+    .bottom-nav-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      padding: 5px 12px; border: none; background: none; font-family: inherit;
+      color: var(--text-secondary); font-size: 10px; font-weight: 500; cursor: pointer;
+    }
+    .bottom-nav-btn.active { color: var(--accent); }
+    .bottom-nav-btn svg { width: 20px; height: 20px; stroke-width: 2; }
+
+    /* ── Responsive ────────────────────────────────────────────────────── */
+    @media (max-width: 1100px) {
+      .stat-grid  { grid-template-columns: repeat(2,1fr); }
+      .dash-grid  { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,.3); }
+      .sidebar-overlay.open { display: block; }
+      .main { margin-left: 0; }
+      .hamburger { display: flex; }
+      .topbar { padding: 0 16px; }
+      .topbar-search { display: none; }
+      .content { padding: 16px; padding-bottom: 80px; }
+      .bottom-nav { display: block; }
+      .sidebar-footer-links { display: none; }
+      .dash-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 540px) {
+      .stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .apps-grid { grid-template-columns: 1fr 1fr; }
+      .login-card { width: calc(100vw - 32px); padding: 28px 20px; }
+    }
+    /* VPS table/card split */
+    .vps-table-wrap { overflow-x: auto; }
+    @media (max-width: 640px) {
+      .vps-table-wrap { display: none; }
+      .vps-mobile-cards { display: flex; flex-direction: column; gap: 12px; }
+    }
+    @media (min-width: 641px) {
+      .vps-mobile-cards { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════ LOGIN VIEW ════════ -->
+<div id="login-view">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-mark">N</div>
+      <div>
+        <h1>NewTekk Manage</h1>
+        <p>Customer Portal</p>
+      </div>
+    </div>
+    <form id="login-form" novalidate>
+      <div class="form-group">
+        <label for="login-user">Username</label>
+        <input id="login-user" type="text" autocomplete="username" placeholder="Enter your username" required>
+      </div>
+      <div class="form-group">
+        <label for="login-pass">Password</label>
+        <input id="login-pass" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+      </div>
+      <button type="submit" class="btn-primary" id="login-btn">Sign In</button>
+    </form>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ════════ APP SHELL ════════ -->
+<div id="app-shell">
+
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo-mark">N</div>
+      <div>
+        <div class="sidebar-logo-text">NewTekk</div>
+        <div class="sidebar-logo-sub">Manage</div>
+      </div>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-label">Overview</div>
+      <div class="nav-item active" data-nav="dashboard" onclick="navigate('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </div>
+
+      <div class="nav-label">Infrastructure</div>
+      <div class="nav-item" data-nav="vps" onclick="navigate('vps')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        VPS Servers
+      </div>
+      <div class="nav-item disabled">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Networking
+      </div>
+      <div class="nav-item disabled">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        SSH Keys
+      </div>
+
+      <div class="nav-label">Apps</div>
+      <div class="nav-item" data-nav="apps" onclick="navigate('apps')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        Applications
+      </div>
+
+      <div class="nav-label">Account</div>
+      <div class="nav-item" data-nav="billing" onclick="navigate('billing')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Billing
+      </div>
+      <div class="nav-item disabled">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Alerts
+      </div>
+      <div class="nav-item" data-nav="settings" onclick="navigate('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="user-avatar" id="sidebar-avatar">?</div>
+        <div style="flex:1;min-width:0">
+          <div class="user-name" id="sidebar-username">Loading…</div>
+          <div class="user-role">Administrator</div>
+        </div>
+      </div>
+      <div class="sidebar-footer-links">
+        <div class="footer-link" onclick="window.open('https://newtekk.com/docs','_blank')">Docs</div>
+        <div class="footer-link" onclick="window.open('mailto:support@newtekk.com')">Support</div>
+        <div class="footer-link" onclick="logout()">Logout</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="breadcrumb">NewTekk / <span id="breadcrumb-label">Dashboard</span></div>
+      <div class="topbar-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Search…
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="icon-btn" title="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+        <div class="topbar-avatar" id="topbar-avatar" title="Account">?</div>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- Dashboard -->
+      <div class="section active" id="section-dashboard">
+        <div id="dash-loading" class="spinner"><div class="spinner-ring"></div></div>
+        <div id="dash-content" style="display:none">
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-label">Active VPS</div>
+              <div class="stat-value" id="stat-vps-total">—</div>
+              <div class="stat-sub">Virtual machines</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Online Services</div>
+              <div class="stat-value" id="stat-apps-ratio">—</div>
+              <div class="stat-sub" id="stat-apps-sub">of — apps</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">VPS Online</div>
+              <div class="stat-value" id="stat-vps-online">—</div>
+              <div class="stat-sub">Running instances</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Monthly Spend</div>
+              <div class="stat-value">$—</div>
+              <div class="stat-sub"><button class="card-action" onclick="navigate('billing')">View billing</button></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">VPS Servers</span>
+              <button class="card-action" onclick="navigate('vps')">View all →</button>
+            </div>
+            <table>
+              <thead><tr><th>Name</th><th>IP Address</th><th>Status</th><th>Plan</th></tr></thead>
+              <tbody id="dash-vps-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="dash-grid">
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Applications</span>
+                <button class="card-action" onclick="navigate('apps')">View all →</button>
+              </div>
+              <div class="apps-grid" id="dash-apps-grid"></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Activity</span></div>
+              <div class="empty-state" style="padding:28px 0">
+                <p>Activity log coming soon.</p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Quick Links</span></div>
+              <div class="quick-links">
+                <a class="quick-link" href="https://proxymanager.newtekk.com" target="_blank">🌐 Nginx Proxy Manager</a>
+                <a class="quick-link" href="https://docker.newtekk.com" target="_blank">📦 Portainer</a>
+                <a class="quick-link" href="https://vpn.newtekk.com" target="_blank">🔒 WireGuard VPN</a>
+                <a class="quick-link" href="https://security.newtekk.com" target="_blank">🛡️ SecureScout</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VPS Servers -->
+      <div class="section" id="section-vps">
+        <div id="vps-loading" class="spinner"><div class="spinner-ring"></div></div>
+        <div id="vps-content" style="display:none">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">VPS Servers</span>
+              <span id="vps-count" style="font-size:13px;color:var(--text-secondary)"></span>
+            </div>
+            <div class="vps-table-wrap">
+              <table>
+                <thead><tr><th>Name / IP</th><th>Status</th><th>Plan</th><th>State</th><th>Actions</th></tr></thead>
+                <tbody id="vps-tbody"></tbody>
+              </table>
+            </div>
+            <div class="vps-mobile-cards" id="vps-mobile-cards"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Applications -->
+      <div class="section" id="section-apps">
+        <div id="apps-loading" class="spinner"><div class="spinner-ring"></div></div>
+        <div id="apps-content" style="display:none">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Applications</span>
+              <span id="apps-count" style="font-size:13px;color:var(--text-secondary)"></span>
+            </div>
+            <div class="apps-grid" id="apps-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Billing -->
+      <div class="section" id="section-billing">
+        <div id="billing-loading" class="spinner"><div class="spinner-ring"></div></div>
+        <div id="billing-content" style="display:none">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Orders &amp; Billing</span></div>
+            <div id="billing-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="section" id="section-settings">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Portal Settings</span></div>
+          <div class="settings-group">
+            <div class="settings-label">Portal</div>
+            <div class="settings-row">
+              <span>Version</span>
+              <span class="settings-val">1.0.0</span>
+            </div>
+            <div class="settings-row">
+              <span>Auth Server URL</span>
+              <span class="settings-val" id="settings-auth-url">https://auth.newtekk.com</span>
+            </div>
+            <div class="settings-row">
+              <span>Support</span>
+              <a href="mailto:support@newtekk.com" style="color:var(--accent);font-size:13px">support@newtekk.com</a>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-label">Account</div>
+            <div class="settings-row">
+              <span>Signed in as</span>
+              <span class="settings-val" id="settings-username">—</span>
+            </div>
+            <div class="settings-row">
+              <span>Session</span>
+              <button class="btn btn-ghost btn-sm" onclick="logout()">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+
+  <!-- Bottom nav (mobile) -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-items">
+      <button class="bottom-nav-btn active" data-nav="dashboard" onclick="navigate('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        Home
+      </button>
+      <button class="bottom-nav-btn" data-nav="vps" onclick="navigate('vps')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/></svg>
+        VPS
+      </button>
+      <button class="bottom-nav-btn" data-nav="apps" onclick="navigate('apps')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        Apps
+      </button>
+      <button class="bottom-nav-btn" data-nav="billing" onclick="navigate('billing')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Billing
+      </button>
+    </div>
+  </nav>
+
+</div><!-- /app-shell -->
+
+<div id="toast-container"></div>
+
+<script>
+// ══ State ══════════════════════════════════════════════════════════════════════
+let currentUser = null;
+const token = () => sessionStorage.getItem('nt_token');
+
+// ══ API ════════════════════════════════════════════════════════════════════════
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const t = token();
+  if (t) opts.headers['Authorization'] = `Bearer ${t}`;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  if (res.status === 401) { logout(); return null; }
+  try { return await res.json(); } catch { return null; }
+}
+
+// ══ Helpers ════════════════════════════════════════════════════════════════════
+function badge(state) {
+  if (state == null) return `<span class="badge warning">Unknown</span>`;
+  const s = String(state).toLowerCase();
+  const cls = (s === 'running' || s === 'active') ? 'online'
+            : (s === 'stopped' || s === 'halted') ? 'offline'
+            : 'warning';
+  return `<span class="badge ${cls}">${state}</span>`;
+}
+
+function upBadge(up) {
+  return up ? `<span class="badge online">Online</span>` : `<span class="badge offline">Offline</span>`;
+}
+
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function setInitial(el, name) {
+  if (el && name) el.textContent = (name[0] || '?').toUpperCase();
+}
+
+function showSpinner(id, show) {
+  const sp = document.getElementById(id + '-loading');
+  const ct = document.getElementById(id + '-content');
+  if (sp) sp.style.display = show ? 'flex' : 'none';
+  if (ct) ct.style.display = show ? 'none' : 'block';
+}
+
+// ══ Navigation ══════════════════════════════════════════════════════════════════
+const sections = {
+  dashboard: { label: 'Dashboard',    load: loadDashboard },
+  vps:       { label: 'VPS Servers',  load: loadVps       },
+  apps:      { label: 'Applications', load: loadApps      },
+  billing:   { label: 'Billing',      load: loadBilling   },
+  settings:  { label: 'Settings',     load: loadSettings  }
+};
+
+function navigate(section) {
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.classList.toggle('active', el.dataset.nav === section);
+  });
+  document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+  const sec = document.getElementById('section-' + section);
+  if (sec) sec.classList.add('active');
+  const info = sections[section];
+  document.getElementById('breadcrumb-label').textContent = info?.label || section;
+  info?.load?.();
+  closeSidebar();
+}
+
+// ══ Sidebar ════════════════════════════════════════════════════════════════════
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
+
+// ══ Auth ══════════════════════════════════════════════════════════════════════
+document.getElementById('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn    = document.getElementById('login-btn');
+  const errEl  = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  try {
+    const data = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('login-user').value.trim(),
+        password: document.getElementById('login-pass').value
+      })
+    }).then(r => r.json());
+
+    if (data && data.token) {
+      sessionStorage.setItem('nt_token', data.token);
+      await showApp();
+    } else {
+      errEl.textContent = (data && data.error) || 'Invalid username or password.';
+      errEl.style.display = 'block';
+    }
+  } catch {
+    errEl.textContent = 'Connection error. Please try again.';
+    errEl.style.display = 'block';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Sign In';
+});
+
+function logout() {
+  sessionStorage.removeItem('nt_token');
+  currentUser = null;
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('login-view').style.display = 'flex';
+  // Reset load flags so sections reload on next login
+  dashLoaded = vpsLoaded = appsLoaded = billingLoaded = false;
+}
+
+async function showApp() {
+  const user = await api('GET', '/api/me');
+  if (!user) return;
+  currentUser = user;
+  const name = user.username || user.name || 'User';
+  document.getElementById('sidebar-username').textContent = name;
+  document.getElementById('settings-username').textContent = name;
+  setInitial(document.getElementById('sidebar-avatar'), name);
+  setInitial(document.getElementById('topbar-avatar'), name);
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'block';
+  navigate('dashboard');
+}
+
+// ══ Dashboard ══════════════════════════════════════════════════════════════════
+let dashLoaded = false;
+async function loadDashboard() {
+  if (dashLoaded) return;
+  showSpinner('dash', true);
+  const data = await api('GET', '/api/dashboard');
+  showSpinner('dash', false);
+  if (!data) { showSpinner('dash', true); return; }
+  dashLoaded = true;
+
+  const vps  = data.vps  || { total: 0, online: 0, list: [] };
+  const apps = data.apps || [];
+
+  document.getElementById('stat-vps-total').textContent  = vps.total;
+  document.getElementById('stat-vps-online').textContent = vps.online;
+  document.getElementById('stat-apps-ratio').textContent = data.appsOnline ?? 0;
+  document.getElementById('stat-apps-sub').textContent   = `of ${apps.length} apps`;
+
+  // VPS table (top 3)
+  const rows = vps.list.slice(0, 3);
+  document.getElementById('dash-vps-tbody').innerHTML = rows.length
+    ? rows.map(v => `<tr>
+        <td><strong>${escHtml(v.hostname || v.label || 'VPS')}</strong></td>
+        <td style="color:var(--text-secondary);font-size:12px">${escHtml(v.main_ip || v.ip || '—')}</td>
+        <td>${badge(v.status || v.state)}</td>
+        <td>${escHtml(v.plan || v.os || '—')}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary)">No VPS data available.</td></tr>`;
+
+  // Apps mini-grid
+  document.getElementById('dash-apps-grid').innerHTML = apps.map(a => `
+    <div class="app-card">
+      <div class="app-card-head">
+        <span class="app-emoji">${a.emoji || '🔹'}</span>
+        ${upBadge(a.up)}
+      </div>
+      <div class="app-name">${escHtml(a.name)}</div>
+      <div class="app-ms">${a.up ? `${a.ms}ms` : 'Unreachable'}</div>
+    </div>`).join('');
+
+  document.getElementById('dash-content').style.display = 'block';
+}
+
+// ══ VPS ══════════════════════════════════════════════════════════════════════
+let vpsLoaded = false;
+async function loadVps() {
+  if (vpsLoaded) return;
+  showSpinner('vps', true);
+  const data = await api('GET', '/api/vps');
+  showSpinner('vps', false);
+  if (!data) return;
+  vpsLoaded = true;
+
+  const list = Array.isArray(data) ? data : (data.data || []);
+  document.getElementById('vps-count').textContent = `${list.length} server${list.length !== 1 ? 's' : ''}`;
+
+  // Desktop table
+  document.getElementById('vps-tbody').innerHTML = list.length
+    ? list.map(v => {
+        const name  = escHtml(v.hostname || v.label || 'VPS');
+        const ip    = escHtml(v.main_ip || v.ip || '—');
+        const state = v.status || v.state || 'unknown';
+        const plan  = escHtml(v.plan || v.os || '—');
+        const id    = encodeURIComponent(v.id || '');
+        return `<tr>
+          <td><strong>${name}</strong><br><span style="color:var(--text-secondary);font-size:12px">${ip}</span></td>
+          <td>${badge(state)}</td>
+          <td>${plan}</td>
+          <td><code style="font-size:12px">${escHtml(state)}</code></td>
+          <td><button class="btn btn-ghost btn-sm" onclick="restartVps('${id}', this)">Restart</button></td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-secondary)">No VPS servers found.</td></tr>`;
+
+  // Mobile cards
+  document.getElementById('vps-mobile-cards').innerHTML = list.map(v => {
+    const name  = escHtml(v.hostname || v.label || 'VPS');
+    const ip    = escHtml(v.main_ip || v.ip || '—');
+    const state = v.status || v.state || 'unknown';
+    const id    = encodeURIComponent(v.id || '');
+    return `<div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <strong>${name}</strong>${badge(state)}
+      </div>
+      <div style="color:var(--text-secondary);font-size:13px;margin-bottom:14px">${ip} &middot; ${escHtml(v.plan || '—')}</div>
+      <button class="btn btn-ghost btn-sm" onclick="restartVps('${id}', this)">Restart</button>
+    </div>`;
+  }).join('');
+
+  document.getElementById('vps-content').style.display = 'block';
+}
+
+async function restartVps(id, btn) {
+  if (!confirm('Send a restart command to this VPS? The server will be briefly offline.')) return;
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Restarting…';
+  const res = await api('POST', `/api/vps/${id}/restart`);
+  btn.disabled = false;
+  btn.textContent = orig;
+  if (res !== null) {
+    toast('Restart command sent successfully.', 'success');
+  } else {
+    toast('Restart failed — check server logs.', 'error');
+  }
+}
+
+// ══ Apps ══════════════════════════════════════════════════════════════════════
+let appsLoaded = false;
+async function loadApps() {
+  if (appsLoaded) return;
+  showSpinner('apps', true);
+  const data = await api('GET', '/api/apps');
+  showSpinner('apps', false);
+  if (!data) return;
+  appsLoaded = true;
+
+  const online = data.filter(a => a.up).length;
+  document.getElementById('apps-count').textContent = `${online} of ${data.length} online`;
+
+  document.getElementById('apps-grid').innerHTML = data.map(a => `
+    <div class="app-card">
+      <div class="app-card-head">
+        <span class="app-emoji">${a.emoji || '🔹'}</span>
+        ${upBadge(a.up)}
+      </div>
+      <div class="app-name">${escHtml(a.name)}</div>
+      <div class="app-desc">${escHtml(a.desc || '')}</div>
+      <div class="app-ms">${a.up ? `${a.ms}ms response` : 'Unreachable'}</div>
+      ${a.href ? `<a class="app-link" href="${escHtml(a.href)}" target="_blank" rel="noopener">Open →</a>` : ''}
+    </div>`).join('');
+
+  document.getElementById('apps-content').style.display = 'block';
+}
+
+// ══ Billing ════════════════════════════════════════════════════════════════════
+let billingLoaded = false;
+async function loadBilling() {
+  if (billingLoaded) return;
+  showSpinner('billing', true);
+  const data = await api('GET', '/api/billing');
+  showSpinner('billing', false);
+  if (!data) return;
+  billingLoaded = true;
+
+  const orders = Array.isArray(data) ? data : (data.data || []);
+  if (orders.length === 0) {
+    document.getElementById('billing-body').innerHTML = `
+      <div class="empty-state">
+        <h3>No billing history</h3>
+        <p>Your orders and invoices will appear here.</p>
+      </div>`;
+  } else {
+    document.getElementById('billing-body').innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Order ID</th><th>Service</th><th>Status</th><th>Amount</th><th>Date</th></tr>
+        </thead>
+        <tbody>
+          ${orders.map(o => `<tr>
+            <td><code style="font-size:12px">${escHtml(String(o.id || o.order_id || '—'))}</code></td>
+            <td>${escHtml(o.service || o.description || o.product || '—')}</td>
+            <td>${badge(o.status || 'unknown')}</td>
+            <td>${o.total != null ? `$${o.total}` : '—'}</td>
+            <td>${o.created_at ? new Date(o.created_at).toLocaleDateString() : '—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  document.getElementById('billing-content').style.display = 'block';
+}
+
+// ══ Settings ════════════════════════════════════════════════════════════════════
+function loadSettings() {
+  if (currentUser) {
+    document.getElementById('settings-username').textContent =
+      currentUser.username || currentUser.name || '—';
+  }
+}
+
+// ══ Utility ════════════════════════════════════════════════════════════════════
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ══ Init ═══════════════════════════════════════════════════════════════════════
+async function init() {
+  if (token()) {
+    await showApp();
+  }
+  // If no token, login view is already visible (display:flex by default)
+}
+
+init();
+</script>
+</body>
+</html>

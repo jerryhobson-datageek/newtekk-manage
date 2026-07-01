@@ -1,0 +1,13 @@
+{
+  "port": 3004,
+  "hostingerToken": "YOUR_HOSTINGER_API_TOKEN",
+  "authUrl": "https://auth.newtekk.com",
+  "apps": [
+    { "id": "pulsewatch",    "name": "PulseWatch",          "desc": "Uptime monitoring",     "url": "https://pulsewatch.newtekk.com",    "emoji": "📋", "color": "blue",  "href": "https://pulsewatch.newtekk.com" },
+    { "id": "securescout",  "name": "SecureScout",          "desc": "Security scanning",     "url": "https://security.newtekk.com",      "emoji": "🛡️", "color": "blue",  "href": "https://security.newtekk.com" },
+    { "id": "auth",         "name": "NewTekk Auth",         "desc": "Authentication server", "url": "https://auth.newtekk.com",          "emoji": "🔑", "color": "green", "href": "https://auth.newtekk.com" },
+    { "id": "proxymanager", "name": "Nginx Proxy Manager",  "desc": "Reverse proxy",         "url": "https://proxymanager.newtekk.com",  "emoji": "🌐", "color": "gray",  "href": "https://proxymanager.newtekk.com" },
+    { "id": "portainer",    "name": "Portainer",            "desc": "Container manager",     "url": "https://docker.newtekk.com",        "emoji": "📦", "color": "gray",  "href": "https://docker.newtekk.com" },
+    { "id": "wireguard",    "name": "WireGuard VPN",        "desc": "VPN management",        "url": "https://vpn.newtekk.com",           "emoji": "🔒", "color": "green", "href": "https://vpn.newtekk.com" }
+  ]
+}
