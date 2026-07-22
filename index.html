@@ -354,8 +354,8 @@
     </div>
     <form id="login-form" novalidate>
       <div class="form-group">
-        <label for="login-user">Username</label>
-        <input id="login-user" type="text" autocomplete="username" placeholder="Enter your username" required>
+        <label for="login-user">Email</label>
+        <input id="login-user" type="email" autocomplete="username" placeholder="Enter your email" required>
       </div>
       <div class="form-group">
         <label for="login-pass">Password</label>
@@ -728,7 +728,7 @@ document.getElementById('login-form').addEventListener('submit', async e => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        username: document.getElementById('login-user').value.trim(),
+        email: document.getElementById('login-user').value.trim(),
         password: document.getElementById('login-pass').value
       })
     }).then(r => r.json());
