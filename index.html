@@ -404,11 +404,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
         VPS Servers
       </div>
-      <div class="nav-item disabled">
+      <div class="nav-item" data-nav="networking" onclick="navigate('networking')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         Networking
       </div>
-      <div class="nav-item disabled">
+      <div class="nav-item" data-nav="ssh-keys" onclick="navigate('ssh-keys')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
         SSH Keys
       </div>
@@ -424,7 +424,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
         Billing
       </div>
-      <div class="nav-item disabled">
+      <div class="nav-item" data-nav="alerts" onclick="navigate('alerts')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         Alerts
       </div>
@@ -575,6 +575,41 @@
         </div>
       </div>
 
+      <!-- Networking -->
+      <div class="section" id="section-networking">
+        <div id="networking-loading" class="spinner"><div class="spinner-ring"></div></div>
+        <div id="networking-content" style="display:none">
+          <div class="card">
+            <div class="card-header"><span class="card-title">DNS Records — <span id="net-zone-name">—</span></span></div>
+            <table>
+              <thead><tr><th>Type</th><th>Name</th><th>Points to</th><th>Proxy</th></tr></thead>
+              <tbody id="net-dns-tbody"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">VPS Network</span></div>
+            <div id="net-vps-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SSH Keys -->
+      <div class="section" id="section-ssh-keys">
+        <div id="ssh-keys-loading" class="spinner"><div class="spinner-ring"></div></div>
+        <div id="ssh-keys-content" style="display:none">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">SSH Keys</span>
+              <span id="ssh-keys-count" style="font-size:13px;color:var(--text-secondary)"></span>
+            </div>
+            <table>
+              <thead><tr><th>Name</th><th>Type</th><th>Fingerprint</th></tr></thead>
+              <tbody id="ssh-keys-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- Applications -->
       <div class="section" id="section-apps">
         <div id="apps-loading" class="spinner"><div class="spinner-ring"></div></div>
@@ -596,6 +631,30 @@
           <div class="card">
             <div class="card-header"><span class="card-title">Orders &amp; Billing</span></div>
             <div id="billing-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alerts -->
+      <div class="section" id="section-alerts">
+        <div id="alerts-loading" class="spinner"><div class="spinner-ring"></div></div>
+        <div id="alerts-content" style="display:none">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Certificate Expiry</span></div>
+            <table>
+              <thead><tr><th>Host</th><th>Issuer</th><th>Expires</th><th>Status</th></tr></thead>
+              <tbody id="cert-tbody"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Firewall Blocks (24h)</span>
+              <span id="fw-count" style="font-size:13px;color:var(--text-secondary)"></span>
+            </div>
+            <table>
+              <thead><tr><th>Host</th><th>Action</th><th>Country</th><th>IP</th><th>When</th></tr></thead>
+              <tbody id="fw-tbody"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -729,11 +788,14 @@ function showSpinner(id, show) {
 
 // ══ Navigation ══════════════════════════════════════════════════════════════════
 const sections = {
-  dashboard: { label: 'Dashboard',    load: loadDashboard },
-  vps:       { label: 'VPS Servers',  load: loadVps       },
-  apps:      { label: 'Applications', load: loadApps      },
-  billing:   { label: 'Billing',      load: loadBilling   },
-  settings:  { label: 'Settings',     load: loadSettings  }
+  dashboard:   { label: 'Dashboard',    load: loadDashboard   },
+  vps:         { label: 'VPS Servers',  load: loadVps         },
+  networking:  { label: 'Networking',   load: loadNetworking  },
+  'ssh-keys':  { label: 'SSH Keys',     load: loadSshKeys     },
+  apps:        { label: 'Applications', load: loadApps        },
+  billing:     { label: 'Billing',      load: loadBilling     },
+  alerts:      { label: 'Alerts',       load: loadAlerts      },
+  settings:    { label: 'Settings',     load: loadSettings    }
 };
 
 function navigate(section) {
@@ -1020,6 +1082,71 @@ async function restartVps(id, btn) {
   }
 }
 
+// ══ Networking ═════════════════════════════════════════════════════════════════
+let networkingLoaded = false;
+async function loadNetworking() {
+  if (networkingLoaded) return;
+  showSpinner('networking', true);
+  const data = await api('GET', '/api/networking');
+  showSpinner('networking', false);
+  if (!data) return;
+  networkingLoaded = true;
+
+  const dns = data.cloudflare?.dns || [];
+  document.getElementById('net-zone-name').textContent = data.cloudflare?.zone?.name || '—';
+  document.getElementById('net-dns-tbody').innerHTML = dns.length
+    ? dns.map(r => `
+        <tr>
+          <td><code style="font-size:12px">${escHtml(r.type)}</code></td>
+          <td>${escHtml(r.name)}</td>
+          <td style="color:var(--text-secondary);font-size:12.5px">${escHtml(r.content)}</td>
+          <td>${r.proxied ? '<span class="badge online">Proxied</span>' : '<span class="badge warning">DNS only</span>'}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary)">No DNS data available.</td></tr>`;
+
+  const vpsList = data.vps || [];
+  document.getElementById('net-vps-body').innerHTML = vpsList.length
+    ? vpsList.map(v => `
+        <div class="settings-row">
+          <span>${escHtml(v.hostname)}</span>
+          <span class="settings-val">${(v.ipv4 || []).map(a => escHtml(a.address)).join(', ') || '—'}</span>
+        </div>
+        <div class="settings-row">
+          <span>IPv6</span>
+          <span class="settings-val">${(v.ipv6 || []).map(a => escHtml(a.address)).join(', ') || '—'}</span>
+        </div>
+        <div class="settings-row">
+          <span>Nameservers</span>
+          <span class="settings-val">${escHtml(v.ns1 || '—')}, ${escHtml(v.ns2 || '—')}</span>
+        </div>`).join('')
+    : `<div class="empty-state"><p>No VPS network data available.</p></div>`;
+
+  document.getElementById('networking-content').style.display = 'block';
+}
+
+// ══ SSH Keys ═══════════════════════════════════════════════════════════════════
+let sshKeysLoaded = false;
+async function loadSshKeys() {
+  if (sshKeysLoaded) return;
+  showSpinner('ssh-keys', true);
+  const data = await api('GET', '/api/ssh-keys');
+  showSpinner('ssh-keys', false);
+  if (!data) return;
+  sshKeysLoaded = true;
+
+  document.getElementById('ssh-keys-count').textContent = `${data.length} key${data.length !== 1 ? 's' : ''}`;
+  document.getElementById('ssh-keys-tbody').innerHTML = data.length
+    ? data.map(k => `
+        <tr>
+          <td><strong>${escHtml(k.name)}</strong></td>
+          <td><code style="font-size:12px">${escHtml(k.type)}</code></td>
+          <td style="color:var(--text-secondary);font-size:12px;font-family:monospace">${escHtml(k.fingerprint || '—')}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-secondary)">No SSH keys found.</td></tr>`;
+
+  document.getElementById('ssh-keys-content').style.display = 'block';
+}
+
 // ══ Apps ══════════════════════════════════════════════════════════════════════
 let appsLoaded = false;
 async function loadApps() {
@@ -1084,6 +1211,53 @@ async function loadBilling() {
   }
 
   document.getElementById('billing-content').style.display = 'block';
+}
+
+// ══ Alerts ═════════════════════════════════════════════════════════════════════
+let alertsLoaded = false;
+async function loadAlerts() {
+  if (alertsLoaded) return;
+  showSpinner('alerts', true);
+  const data = await api('GET', '/api/alerts');
+  showSpinner('alerts', false);
+  if (!data) return;
+  alertsLoaded = true;
+
+  const certs = data.certExpiries || [];
+  document.getElementById('cert-tbody').innerHTML = certs.length
+    ? certs.map(c => {
+        if (c.error) return `
+          <tr>
+            <td><strong>${escHtml(c.hostname)}</strong></td>
+            <td colspan="2" style="color:var(--text-secondary)">Could not check</td>
+            <td><span class="badge warning">Unknown</span></td>
+          </tr>`;
+        const cls = c.daysLeft <= 14 ? 'offline' : c.daysLeft <= 30 ? 'warning' : 'online';
+        const label = c.daysLeft <= 30 ? `${c.daysLeft}d left` : 'OK';
+        return `
+          <tr>
+            <td><strong>${escHtml(c.hostname)}</strong></td>
+            <td style="color:var(--text-secondary)">${escHtml(c.issuer || '—')}</td>
+            <td style="color:var(--text-secondary);font-size:12.5px">${new Date(c.validTo).toLocaleDateString()}</td>
+            <td><span class="badge ${cls}">${label}</span></td>
+          </tr>`;
+      }).join('')
+    : `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary)">No certificate data available.</td></tr>`;
+
+  const events = data.firewallEvents || [];
+  document.getElementById('fw-count').textContent = `${events.length} blocked`;
+  document.getElementById('fw-tbody').innerHTML = events.length
+    ? events.map(e => `
+        <tr>
+          <td>${escHtml(e.clientRequestHTTPHost || '—')}</td>
+          <td><span class="badge offline">${escHtml(e.action)}</span></td>
+          <td>${escHtml(e.clientCountryName || '—')}</td>
+          <td style="font-family:monospace;font-size:12px">${escHtml(e.clientIP || '—')}</td>
+          <td style="color:var(--text-secondary);font-size:12px">${relTime(new Date(e.datetime).getTime())}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-secondary)">No firewall blocks in the last 24h.</td></tr>`;
+
+  document.getElementById('alerts-content').style.display = 'block';
 }
 
 // ══ Settings ════════════════════════════════════════════════════════════════════

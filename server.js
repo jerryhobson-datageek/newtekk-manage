@@ -1,8 +1,10 @@
 'use strict';
-const http  = require('http');
-const https = require('https');
-const fs    = require('fs');
-const path  = require('path');
+const http   = require('http');
+const https  = require('https');
+const tls    = require('tls');
+const crypto = require('crypto');
+const fs     = require('fs');
+const path   = require('path');
 
 // ── Config ───────────────────────────────────────────────────────────────────
 let cfg = {};
@@ -159,7 +161,7 @@ async function fetchCloudflareData() {
   }), { requests: 0, bytes: 0, cachedRequests: 0, threats: 0 });
 
   return {
-    zone: zone ? { name: zone.name, status: zone.status, plan: zone.plan?.name } : null,
+    zone: zone ? { name: zone.name, status: zone.status, plan: zone.plan?.name, nameServers: zone.name_servers || [] } : null,
     dns: dns.map(r => ({ type: r.type, name: r.name, content: r.content, proxied: r.proxied })),
     analytics: {
       requests: totals.requests,
@@ -168,6 +170,64 @@ async function fetchCloudflareData() {
       threats: totals.threats
     }
   };
+}
+
+async function fetchCloudflareFirewallEvents() {
+  const zoneId = await resolveCfZoneId();
+  if (!zoneId) return [];
+
+  const until = new Date();
+  const since = new Date(until.getTime() - 23.5 * 60 * 60 * 1000); // Cloudflare caps ranges at 1 day
+  const query = {
+    query: `query ($zoneTag: String!, $since: Time!, $until: Time!) {
+      viewer { zones(filter: { zoneTag: $zoneTag }) {
+        firewallEventsAdaptive(limit: 30, filter: { datetime_geq: $since, datetime_leq: $until }) {
+          action clientRequestHTTPHost clientCountryName clientIP source datetime
+        }
+      } }
+    }`,
+    variables: { zoneTag: zoneId, since: since.toISOString(), until: until.toISOString() }
+  };
+
+  const r = await cloudflare('POST', '/graphql', query);
+  const events = r.status === 200 ? (r.body?.data?.viewer?.zones?.[0]?.firewallEventsAdaptive || []) : [];
+  return events.slice().sort((a, b) => new Date(b.datetime) - new Date(a.datetime));
+}
+
+async function fetchSshKeys() {
+  const r = await hostinger('GET', '/vps/v1/public-keys');
+  const data = r.status === 200 && Array.isArray(r.body?.data) ? r.body.data : [];
+  return data.map(k => {
+    const parts    = (k.key || '').trim().split(/\s+/);
+    const type     = parts[0] || 'unknown';
+    const keyBody  = parts[1] || '';
+    const fingerprint = keyBody
+      ? crypto.createHash('sha256').update(Buffer.from(keyBody, 'base64')).digest('base64')
+      : null;
+    return { id: k.id, name: k.name, type, fingerprint };
+  });
+}
+
+const CERT_ORIGIN_HOST = '2.24.107.27'; // Hostinger VPS — NPM terminates TLS here for every app, even claudeapps-hosted ones
+
+function checkCertExpiry(hostname) {
+  return new Promise(resolve => {
+    const socket = tls.connect({ host: CERT_ORIGIN_HOST, port: 443, servername: hostname, timeout: 5000, rejectUnauthorized: false }, () => {
+      const cert = socket.getPeerCertificate();
+      socket.end();
+      if (!cert || !cert.valid_to) return resolve({ hostname, error: true });
+      const validTo  = new Date(cert.valid_to);
+      const daysLeft = Math.round((validTo - Date.now()) / (1000 * 60 * 60 * 24));
+      resolve({ hostname, issuer: cert.issuer?.O || null, validTo: validTo.toISOString(), daysLeft });
+    });
+    socket.on('error', () => resolve({ hostname, error: true }));
+    socket.on('timeout', () => { socket.destroy(); resolve({ hostname, error: true }); });
+  });
+}
+
+async function fetchCertExpiries() {
+  const hostnames = [...new Set(cfg.apps.map(a => { try { return new URL(a.url).hostname; } catch { return null; } }).filter(Boolean))];
+  return Promise.all(hostnames.map(checkCertExpiry));
 }
 
 async function httpCheck(url) {
@@ -273,6 +333,36 @@ async function handleCloudflare(req, res) {
   json(res, 200, await fetchCloudflareData());
 }
 
+async function handleNetworking(req, res) {
+  const user = await requireAuth(req);
+  if (!user) return json(res, 401, { error: 'Unauthorized' });
+  const [vpsRes, cf] = await Promise.all([
+    hostinger('GET', '/vps/v1/virtual-machines'),
+    fetchCloudflareData()
+  ]);
+  const list = Array.isArray(vpsRes.body) ? vpsRes.body : (vpsRes.body?.data || []);
+  json(res, 200, {
+    vps: list.map(v => ({ hostname: v.hostname, ipv4: v.ipv4 || [], ipv6: v.ipv6 || [], ns1: v.ns1, ns2: v.ns2 })),
+    cloudflare: cf ? { zone: cf.zone, dns: cf.dns } : null
+  });
+}
+
+async function handleSshKeys(req, res) {
+  const user = await requireAuth(req);
+  if (!user) return json(res, 401, { error: 'Unauthorized' });
+  json(res, 200, await fetchSshKeys());
+}
+
+async function handleAlerts(req, res) {
+  const user = await requireAuth(req);
+  if (!user) return json(res, 401, { error: 'Unauthorized' });
+  const [firewallEvents, certExpiries] = await Promise.all([
+    fetchCloudflareFirewallEvents(),
+    fetchCertExpiries()
+  ]);
+  json(res, 200, { firewallEvents, certExpiries });
+}
+
 async function handleVps(req, res) {
   const user = await requireAuth(req);
   if (!user) return json(res, 401, { error: 'Unauthorized' });
@@ -340,6 +430,9 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/billing'   && method === 'GET')  return handleBilling(req, res);
     if (pathname === '/api/apps'      && method === 'GET')  return handleApps(req, res);
     if (pathname === '/api/cloudflare' && method === 'GET') return handleCloudflare(req, res);
+    if (pathname === '/api/networking' && method === 'GET') return handleNetworking(req, res);
+    if (pathname === '/api/ssh-keys'   && method === 'GET') return handleSshKeys(req, res);
+    if (pathname === '/api/alerts'     && method === 'GET') return handleAlerts(req, res);
 
     const restartMatch = pathname.match(/^\/api\/vps\/([^/]+)\/restart$/);
     if (restartMatch && method === 'POST') return handleVpsRestart(req, res, restartMatch[1]);
