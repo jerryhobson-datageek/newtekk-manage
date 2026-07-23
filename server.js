@@ -14,6 +14,25 @@ fs.watch(CFG_PATH, () => {
   catch (e) { console.error('Config reload failed:', e.message); }
 });
 
+// ── Activity log ─────────────────────────────────────────────────────────────
+const DATA_DIR       = path.join(__dirname, 'data');
+const ACTIVITY_FILE  = path.join(DATA_DIR, 'activity.json');
+const MAX_ACTIVITY   = 200;
+
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(ACTIVITY_FILE)) fs.writeFileSync(ACTIVITY_FILE, '[]');
+
+function loadActivity() {
+  try { return JSON.parse(fs.readFileSync(ACTIVITY_FILE, 'utf8')); }
+  catch { return []; }
+}
+
+function logActivity(type, message, user) {
+  const entries = loadActivity();
+  entries.push({ type, message, user: user || null, ts: Date.now() });
+  fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(entries.slice(-MAX_ACTIVITY), null, 2));
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function json(res, status, data) {
   const body = JSON.stringify(data);
@@ -110,6 +129,9 @@ async function handleLogin(req, res) {
     path: u.pathname, method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) }
   }, bodyStr);
+  if (r.status === 200 && r.body && r.body.user) {
+    logActivity('login', `${r.body.user.email} signed in`, r.body.user.email);
+  }
   json(res, r.status, r.body);
 }
 
@@ -128,6 +150,7 @@ async function handleDashboard(req, res) {
   ]);
   const list = Array.isArray(vpsRes.body) ? vpsRes.body : (vpsRes.body?.data || []);
   const apps = cfg.apps.map((a, i) => ({ ...a, ...checks[i] }));
+  const activity = loadActivity().slice(-8).reverse();
   json(res, 200, {
     vps: {
       total:  list.length,
@@ -135,7 +158,8 @@ async function handleDashboard(req, res) {
       list
     },
     apps,
-    appsOnline: apps.filter(a => a.up).length
+    appsOnline: apps.filter(a => a.up).length,
+    activity
   });
 }
 
@@ -149,7 +173,9 @@ async function handleVps(req, res) {
 async function handleVpsRestart(req, res, id) {
   const user = await requireAuth(req);
   if (!user) return json(res, 401, { error: 'Unauthorized' });
-  const r = await hostinger('POST', `/vps/v1/virtual-machines/${encodeURIComponent(id)}/restart`);
+  const r  = await hostinger('POST', `/vps/v1/virtual-machines/${encodeURIComponent(id)}/restart`);
+  const ok = r.status >= 200 && r.status < 300;
+  logActivity('vps_restart', `${user.email} ${ok ? 'restarted' : 'attempted to restart'} VPS ${id}`, user.email);
   json(res, r.status, r.body);
 }
 

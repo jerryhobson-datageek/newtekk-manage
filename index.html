@@ -283,6 +283,14 @@
     .settings-row:last-child { border-bottom: none; }
     .settings-val     { color: var(--text-secondary); font-size: 13px; font-family: monospace; }
 
+    /* Activity */
+    .activity-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+    .activity-row:last-child { border-bottom: none; }
+    .activity-icon { font-size: 15px; line-height: 1.4; flex-shrink: 0; }
+    .activity-body { min-width: 0; }
+    .activity-msg  { font-size: 13px; color: var(--text-primary); word-break: break-word; }
+    .activity-time { font-size: 11.5px; color: var(--text-secondary); margin-top: 1px; }
+
     /* Empty state */
     .empty-state { text-align: center; padding: 48px 24px; color: var(--text-secondary); }
     .empty-state h3 { font-size: 16px; color: var(--text-primary); margin-bottom: 8px; }
@@ -509,9 +517,7 @@
             </div>
             <div class="card">
               <div class="card-header"><span class="card-title">Activity</span></div>
-              <div class="empty-state" style="padding:28px 0">
-                <p>Activity log coming soon.</p>
-              </div>
+              <div id="dash-activity"></div>
             </div>
             <div class="card">
               <div class="card-header"><span class="card-title">Quick Links</span></div>
@@ -675,6 +681,22 @@ function setInitial(el, name) {
   if (el && name) el.textContent = (name[0] || '?').toUpperCase();
 }
 
+function activityIcon(type) {
+  return type === 'login' ? '🔑' : type === 'vps_restart' ? '🔄' : '•';
+}
+
+function relTime(ts) {
+  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
 function showSpinner(id, show) {
   const sp = document.getElementById(id + '-loading');
   const ct = document.getElementById(id + '-content');
@@ -810,6 +832,19 @@ async function loadDashboard() {
       <div class="app-name">${escHtml(a.name)}</div>
       <div class="app-ms">${a.up ? `${a.ms}ms` : 'Unreachable'}</div>
     </div>`).join('');
+
+  // Activity feed
+  const activity = data.activity || [];
+  document.getElementById('dash-activity').innerHTML = activity.length
+    ? activity.map(a => `
+        <div class="activity-row">
+          <span class="activity-icon">${activityIcon(a.type)}</span>
+          <div class="activity-body">
+            <div class="activity-msg">${escHtml(a.message)}</div>
+            <div class="activity-time">${relTime(a.ts)}</div>
+          </div>
+        </div>`).join('')
+    : `<div class="empty-state" style="padding:28px 0"><p>No recent activity.</p></div>`;
 
   document.getElementById('dash-content').style.display = 'block';
 }
