@@ -509,6 +509,35 @@
             </table>
           </div>
 
+          <div class="card" id="cf-card" style="display:none">
+            <div class="card-header">
+              <span class="card-title">Cloudflare — <span id="cf-zone-name">—</span></span>
+              <span id="cf-zone-status"></span>
+            </div>
+            <div class="vps-stat-grid" style="margin-bottom:16px">
+              <div class="vps-stat">
+                <div class="vps-stat-label">Requests (24h)</div>
+                <div class="vps-stat-value" id="cf-requests">—</div>
+              </div>
+              <div class="vps-stat">
+                <div class="vps-stat-label">Bandwidth (24h)</div>
+                <div class="vps-stat-value" id="cf-bandwidth">—</div>
+              </div>
+              <div class="vps-stat">
+                <div class="vps-stat-label">Cache hit rate</div>
+                <div class="vps-stat-value" id="cf-cache">—</div>
+              </div>
+              <div class="vps-stat">
+                <div class="vps-stat-label">Threats blocked (24h)</div>
+                <div class="vps-stat-value" id="cf-threats">—</div>
+              </div>
+            </div>
+            <table>
+              <thead><tr><th>Type</th><th>Name</th><th>Points to</th><th>Proxy</th></tr></thead>
+              <tbody id="cf-dns-tbody"></tbody>
+            </table>
+          </div>
+
           <div class="dash-grid">
             <div class="card">
               <div class="card-header">
@@ -839,6 +868,28 @@ async function loadDashboard() {
           </div>
         </div>`).join('')
     : `<div class="empty-state" style="padding:28px 0"><p>No recent activity.</p></div>`;
+
+  // Cloudflare
+  const cf = data.cloudflare;
+  const cfCard = document.getElementById('cf-card');
+  if (cf) {
+    cfCard.style.display = 'block';
+    document.getElementById('cf-zone-name').textContent = cf.zone?.name || '—';
+    document.getElementById('cf-zone-status').innerHTML = cf.zone ? badge(cf.zone.status) : '';
+    document.getElementById('cf-requests').textContent  = cf.analytics.requests.toLocaleString();
+    document.getElementById('cf-bandwidth').textContent = fmtBytes(cf.analytics.bytes);
+    document.getElementById('cf-cache').textContent     = cf.analytics.cacheHitPct + '%';
+    document.getElementById('cf-threats').textContent   = cf.analytics.threats.toLocaleString();
+    document.getElementById('cf-dns-tbody').innerHTML = cf.dns.map(r => `
+      <tr>
+        <td><code style="font-size:12px">${escHtml(r.type)}</code></td>
+        <td>${escHtml(r.name)}</td>
+        <td style="color:var(--text-secondary);font-size:12.5px">${escHtml(r.content)}</td>
+        <td>${r.proxied ? '<span class="badge online">Proxied</span>' : '<span class="badge warning">DNS only</span>'}</td>
+      </tr>`).join('');
+  } else {
+    cfCard.style.display = 'none';
+  }
 
   document.getElementById('dash-content').style.display = 'block';
 }

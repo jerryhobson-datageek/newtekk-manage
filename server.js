@@ -95,6 +95,81 @@ async function hostinger(method, apiPath, body) {
   );
 }
 
+async function cloudflare(method, apiPath, body) {
+  const bodyStr = body ? JSON.stringify(body) : undefined;
+  const headers = {
+    Authorization: `Bearer ${cfg.cloudflareToken}`,
+    'Content-Type': 'application/json'
+  };
+  if (bodyStr) headers['Content-Length'] = Buffer.byteLength(bodyStr);
+  return httpsRequest(
+    { hostname: 'api.cloudflare.com', port: 443, path: '/client/v4' + apiPath, method, headers },
+    bodyStr
+  );
+}
+
+let cfZoneId = null;
+let cfZoneForId = null;
+
+async function resolveCfZoneId() {
+  if (cfZoneId && cfZoneForId === cfg.cloudflareZone) return cfZoneId;
+  const r = await cloudflare('GET', `/zones?name=${encodeURIComponent(cfg.cloudflareZone)}`);
+  if (r.status === 200 && r.body?.result?.[0]) {
+    cfZoneId = r.body.result[0].id;
+    cfZoneForId = cfg.cloudflareZone;
+  }
+  return cfZoneId;
+}
+
+async function fetchCloudflareData() {
+  if (!cfg.cloudflareToken || !cfg.cloudflareZone) return null;
+  const zoneId = await resolveCfZoneId();
+  if (!zoneId) return null;
+
+  const until = new Date();
+  const since = new Date(until.getTime() - 24 * 60 * 60 * 1000);
+  const analyticsQuery = {
+    query: `query ($zoneTag: String!, $since: Time!, $until: Time!) {
+      viewer { zones(filter: { zoneTag: $zoneTag }) {
+        httpRequests1hGroups(limit: 24, filter: { datetime_geq: $since, datetime_leq: $until }) {
+          sum { requests bytes cachedRequests threats }
+        }
+      } }
+    }`,
+    variables: { zoneTag: zoneId, since: since.toISOString(), until: until.toISOString() }
+  };
+
+  const [zoneRes, dnsRes, analyticsRes] = await Promise.all([
+    cloudflare('GET', `/zones/${zoneId}`),
+    cloudflare('GET', `/zones/${zoneId}/dns_records?per_page=100`),
+    cloudflare('POST', '/graphql', analyticsQuery)
+  ]);
+
+  const zone   = zoneRes.status === 200 ? zoneRes.body?.result : null;
+  const dns    = dnsRes.status === 200 ? (dnsRes.body?.result || []) : [];
+  const groups = analyticsRes.status === 200
+    ? (analyticsRes.body?.data?.viewer?.zones?.[0]?.httpRequests1hGroups || [])
+    : [];
+
+  const totals = groups.reduce((acc, g) => ({
+    requests: acc.requests + g.sum.requests,
+    bytes: acc.bytes + g.sum.bytes,
+    cachedRequests: acc.cachedRequests + g.sum.cachedRequests,
+    threats: acc.threats + g.sum.threats
+  }), { requests: 0, bytes: 0, cachedRequests: 0, threats: 0 });
+
+  return {
+    zone: zone ? { name: zone.name, status: zone.status, plan: zone.plan?.name } : null,
+    dns: dns.map(r => ({ type: r.type, name: r.name, content: r.content, proxied: r.proxied })),
+    analytics: {
+      requests: totals.requests,
+      bytes: totals.bytes,
+      cacheHitPct: totals.requests ? Math.round((totals.cachedRequests / totals.requests) * 1000) / 10 : 0,
+      threats: totals.threats
+    }
+  };
+}
+
 async function httpCheck(url) {
   const t0 = Date.now();
   return new Promise(resolve => {
@@ -171,8 +246,9 @@ async function handleMe(req, res) {
 async function handleDashboard(req, res) {
   const user = await requireAuth(req);
   if (!user) return json(res, 401, { error: 'Unauthorized' });
-  const [vpsRes, ...checks] = await Promise.all([
+  const [vpsRes, cloudflareData, ...checks] = await Promise.all([
     hostinger('GET', '/vps/v1/virtual-machines'),
+    fetchCloudflareData(),
     ...cfg.apps.map(a => httpCheck(a.url))
   ]);
   const list = Array.isArray(vpsRes.body) ? vpsRes.body : (vpsRes.body?.data || []);
@@ -186,8 +262,15 @@ async function handleDashboard(req, res) {
     },
     apps,
     appsOnline: apps.filter(a => a.up).length,
-    activity
+    activity,
+    cloudflare: cloudflareData
   });
+}
+
+async function handleCloudflare(req, res) {
+  const user = await requireAuth(req);
+  if (!user) return json(res, 401, { error: 'Unauthorized' });
+  json(res, 200, await fetchCloudflareData());
 }
 
 async function handleVps(req, res) {
@@ -256,6 +339,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/vps'       && method === 'GET')  return handleVps(req, res);
     if (pathname === '/api/billing'   && method === 'GET')  return handleBilling(req, res);
     if (pathname === '/api/apps'      && method === 'GET')  return handleApps(req, res);
+    if (pathname === '/api/cloudflare' && method === 'GET') return handleCloudflare(req, res);
 
     const restartMatch = pathname.match(/^\/api\/vps\/([^/]+)\/restart$/);
     if (restartMatch && method === 'POST') return handleVpsRestart(req, res, restartMatch[1]);

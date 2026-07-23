@@ -1,6 +1,8 @@
 {
   "port": 3004,
   "hostingerToken": "YOUR_HOSTINGER_API_TOKEN",
+  "cloudflareToken": "YOUR_CLOUDFLARE_API_TOKEN",
+  "cloudflareZone": "newtekk.com",
   "authUrl": "https://auth.newtekk.com",
   "apps": [
     { "id": "pulsewatch",     "name": "PulseWatch",         "desc": "Uptime monitoring",              "url": "https://pulsewatch.newtekk.com", "emoji": "📋", "color": "blue",   "href": "https://pulsewatch.newtekk.com" },
