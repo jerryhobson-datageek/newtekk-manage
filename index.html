@@ -337,15 +337,17 @@
       .apps-grid { grid-template-columns: 1fr 1fr; }
       .login-card { width: calc(100vw - 32px); padding: 28px 20px; }
     }
-    /* VPS table/card split */
-    .vps-table-wrap { overflow-x: auto; }
-    @media (max-width: 640px) {
-      .vps-table-wrap { display: none; }
-      .vps-mobile-cards { display: flex; flex-direction: column; gap: 12px; }
-    }
-    @media (min-width: 641px) {
-      .vps-mobile-cards { display: none; }
-    }
+    /* VPS detail cards */
+    .vps-card-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    .vps-card-title { font-size: 15px; font-weight: 700; }
+    .vps-card-sub   { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
+    .vps-stat-grid  { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 14px; }
+    .vps-stat       { background: var(--page-bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+    .vps-stat-label { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); margin-bottom: 6px; }
+    .vps-stat-value { font-size: 18px; font-weight: 700; line-height: 1.2; }
+    .vps-stat-sub   { font-size: 11.5px; color: var(--text-secondary); margin-top: 3px; }
+    .vps-bar        { height: 5px; border-radius: 3px; background: var(--border); margin-top: 8px; overflow: hidden; }
+    .vps-bar-fill   { height: 100%; background: var(--accent); border-radius: 3px; }
   </style>
 </head>
 <body>
@@ -536,19 +538,11 @@
       <div class="section" id="section-vps">
         <div id="vps-loading" class="spinner"><div class="spinner-ring"></div></div>
         <div id="vps-content" style="display:none">
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">VPS Servers</span>
-              <span id="vps-count" style="font-size:13px;color:var(--text-secondary)"></span>
-            </div>
-            <div class="vps-table-wrap">
-              <table>
-                <thead><tr><th>Name / IP</th><th>Status</th><th>Plan</th><th>State</th><th>Actions</th></tr></thead>
-                <tbody id="vps-tbody"></tbody>
-              </table>
-            </div>
-            <div class="vps-mobile-cards" id="vps-mobile-cards"></div>
+          <div class="card-header">
+            <span class="card-title" style="font-size:16px">VPS Servers</span>
+            <span id="vps-count" style="font-size:13px;color:var(--text-secondary)"></span>
           </div>
+          <div id="vps-list" style="display:flex;flex-direction:column;gap:16px"></div>
         </div>
       </div>
 
@@ -816,7 +810,7 @@ async function loadDashboard() {
   document.getElementById('dash-vps-tbody').innerHTML = rows.length
     ? rows.map(v => `<tr>
         <td><strong>${escHtml(v.hostname || v.label || 'VPS')}</strong></td>
-        <td style="color:var(--text-secondary);font-size:12px">${escHtml(v.main_ip || v.ip || '—')}</td>
+        <td style="color:var(--text-secondary);font-size:12px">${escHtml((v.ipv4 && v.ipv4[0] && v.ipv4[0].address) || v.main_ip || v.ip || '—')}</td>
         <td>${badge(v.status || v.state)}</td>
         <td>${escHtml(v.plan || v.os || '—')}</td>
       </tr>`).join('')
@@ -862,40 +856,102 @@ async function loadVps() {
   const list = Array.isArray(data) ? data : (data.data || []);
   document.getElementById('vps-count').textContent = `${list.length} server${list.length !== 1 ? 's' : ''}`;
 
-  // Desktop table
-  document.getElementById('vps-tbody').innerHTML = list.length
-    ? list.map(v => {
-        const name  = escHtml(v.hostname || v.label || 'VPS');
-        const ip    = escHtml(v.main_ip || v.ip || '—');
-        const state = v.status || v.state || 'unknown';
-        const plan  = escHtml(v.plan || v.os || '—');
-        const id    = encodeURIComponent(v.id || '');
-        return `<tr>
-          <td><strong>${name}</strong><br><span style="color:var(--text-secondary);font-size:12px">${ip}</span></td>
-          <td>${badge(state)}</td>
-          <td>${plan}</td>
-          <td><code style="font-size:12px">${escHtml(state)}</code></td>
-          <td><button class="btn btn-ghost btn-sm" onclick="restartVps('${id}', this)">Restart</button></td>
-        </tr>`;
-      }).join('')
-    : `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-secondary)">No VPS servers found.</td></tr>`;
-
-  // Mobile cards
-  document.getElementById('vps-mobile-cards').innerHTML = list.map(v => {
-    const name  = escHtml(v.hostname || v.label || 'VPS');
-    const ip    = escHtml(v.main_ip || v.ip || '—');
-    const state = v.status || v.state || 'unknown';
-    const id    = encodeURIComponent(v.id || '');
-    return `<div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <strong>${name}</strong>${badge(state)}
-      </div>
-      <div style="color:var(--text-secondary);font-size:13px;margin-bottom:14px">${ip} &middot; ${escHtml(v.plan || '—')}</div>
-      <button class="btn btn-ghost btn-sm" onclick="restartVps('${id}', this)">Restart</button>
-    </div>`;
-  }).join('');
+  document.getElementById('vps-list').innerHTML = list.length
+    ? list.map(vmCard).join('')
+    : `<div class="card"><div class="empty-state"><h3>No VPS servers found.</h3></div></div>`;
 
   document.getElementById('vps-content').style.display = 'block';
+}
+
+function pct(used, total) {
+  return total ? Math.round((used / total) * 1000) / 10 : null;
+}
+
+function fmtBytes(b) {
+  if (b == null) return '—';
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  if (b < 1024 * 1024 * 1024) return `${(b / 1024 / 1024).toFixed(1)} MB`;
+  return `${(b / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+function fmtUptime(s) {
+  if (s == null) return '—';
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600);
+  return d > 0 ? `${d}d ${h}h` : `${h}h`;
+}
+
+function statBar(pctVal) {
+  return `<div class="vps-bar"><div class="vps-bar-fill" style="width:${Math.min(100, pctVal)}%"></div></div>`;
+}
+
+function vmCard(v) {
+  const name  = escHtml(v.hostname || v.label || 'VPS');
+  const ip    = escHtml((v.ipv4 && v.ipv4[0] && v.ipv4[0].address) || v.main_ip || v.ip || '—');
+  const state = v.status || v.state || 'unknown';
+  const plan  = escHtml(v.plan || v.os || '—');
+  const id    = encodeURIComponent(v.id || '');
+  const m     = v.metrics || {};
+
+  const cpuPct    = m.cpu_usage ? m.cpu_usage.value : null;
+  const ramUsed   = m.ram_usage ? m.ram_usage.value : null;
+  const ramTotal  = v.memory ? v.memory * 1024 * 1024 : null;
+  const diskUsed  = m.disk_space ? m.disk_space.value : null;
+  const diskTotal = v.disk ? v.disk * 1024 * 1024 : null;
+  const netIn     = m.incoming_traffic ? m.incoming_traffic.value : null;
+  const netOut    = m.outgoing_traffic ? m.outgoing_traffic.value : null;
+  const uptime    = m.uptime ? m.uptime.value : null;
+
+  const ramPct  = ramTotal  != null ? pct(ramUsed, ramTotal)   : null;
+  const diskPct = diskTotal != null ? pct(diskUsed, diskTotal) : null;
+
+  const backups = v.backups || { count: 0, latest: null };
+
+  return `
+    <div class="card">
+      <div class="vps-card-head">
+        <div>
+          <div class="vps-card-title">${name}</div>
+          <div class="vps-card-sub">${ip} &middot; ${plan}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          ${badge(state)}
+          <button class="btn btn-ghost btn-sm" onclick="restartVps('${id}', this)">Restart</button>
+        </div>
+      </div>
+      <div class="vps-stat-grid">
+        <div class="vps-stat">
+          <div class="vps-stat-label">CPU</div>
+          <div class="vps-stat-value">${cpuPct != null ? cpuPct.toFixed(1) + '%' : '—'}</div>
+          ${cpuPct != null ? statBar(cpuPct) : ''}
+        </div>
+        <div class="vps-stat">
+          <div class="vps-stat-label">Memory</div>
+          <div class="vps-stat-value">${ramPct != null ? ramPct + '%' : '—'}</div>
+          <div class="vps-stat-sub">${fmtBytes(ramUsed)} / ${fmtBytes(ramTotal)}</div>
+          ${ramPct != null ? statBar(ramPct) : ''}
+        </div>
+        <div class="vps-stat">
+          <div class="vps-stat-label">Disk</div>
+          <div class="vps-stat-value">${diskPct != null ? diskPct + '%' : '—'}</div>
+          <div class="vps-stat-sub">${fmtBytes(diskUsed)} / ${fmtBytes(diskTotal)}</div>
+          ${diskPct != null ? statBar(diskPct) : ''}
+        </div>
+        <div class="vps-stat">
+          <div class="vps-stat-label">Network</div>
+          <div class="vps-stat-value" style="font-size:14px">&darr; ${fmtBytes(netIn)}</div>
+          <div class="vps-stat-sub">&uarr; ${fmtBytes(netOut)}</div>
+        </div>
+        <div class="vps-stat">
+          <div class="vps-stat-label">Uptime</div>
+          <div class="vps-stat-value" style="font-size:16px">${fmtUptime(uptime)}</div>
+        </div>
+        <div class="vps-stat">
+          <div class="vps-stat-label">Backups</div>
+          <div class="vps-stat-value" style="font-size:16px">${backups.count}</div>
+          <div class="vps-stat-sub">${backups.latest ? 'Last: ' + new Date(backups.latest).toLocaleDateString() : 'None yet'}</div>
+        </div>
+      </div>
+    </div>`;
 }
 
 async function restartVps(id, btn) {

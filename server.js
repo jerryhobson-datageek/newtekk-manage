@@ -113,6 +113,33 @@ async function httpCheck(url) {
   });
 }
 
+async function fetchVmMetrics(id) {
+  const to   = new Date();
+  const from = new Date(to.getTime() - 2 * 24 * 60 * 60 * 1000);
+  const fmt  = d => d.toISOString().slice(0, 10);
+  const r = await hostinger('GET', `/vps/v1/virtual-machines/${id}/metrics?date_from=${fmt(from)}&date_to=${fmt(to)}`);
+  if (r.status !== 200 || !r.body) return null;
+
+  const latest = {};
+  for (const key of ['cpu_usage', 'ram_usage', 'disk_space', 'incoming_traffic', 'outgoing_traffic', 'uptime']) {
+    const metric = r.body[key];
+    if (!metric || !metric.usage) continue;
+    const timestamps = Object.keys(metric.usage).map(Number);
+    if (!timestamps.length) continue;
+    const maxTs = Math.max(...timestamps);
+    latest[key] = { value: metric.usage[maxTs], unit: metric.unit, ts: maxTs };
+  }
+  return latest;
+}
+
+async function fetchVmBackups(id) {
+  const r = await hostinger('GET', `/vps/v1/virtual-machines/${id}/backups`);
+  const data = r.status === 200 && r.body && Array.isArray(r.body.data) ? r.body.data : [];
+  if (!data.length) return { count: 0, latest: null };
+  const latest = data.reduce((a, b) => (new Date(a.created_at) > new Date(b.created_at) ? a : b));
+  return { count: data.length, latest: latest.created_at };
+}
+
 // ── Auth middleware ───────────────────────────────────────────────────────────
 async function requireAuth(req) {
   const h = req.headers.authorization || '';
@@ -167,7 +194,14 @@ async function handleVps(req, res) {
   const user = await requireAuth(req);
   if (!user) return json(res, 401, { error: 'Unauthorized' });
   const r = await hostinger('GET', '/vps/v1/virtual-machines');
-  json(res, r.status, r.body);
+  if (r.status !== 200) return json(res, r.status, r.body);
+
+  const list = Array.isArray(r.body) ? r.body : (r.body?.data || []);
+  const enriched = await Promise.all(list.map(async vm => {
+    const [metrics, backups] = await Promise.all([fetchVmMetrics(vm.id), fetchVmBackups(vm.id)]);
+    return { ...vm, metrics, backups };
+  }));
+  json(res, 200, enriched);
 }
 
 async function handleVpsRestart(req, res, id) {
